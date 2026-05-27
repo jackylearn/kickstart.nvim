@@ -10,7 +10,7 @@ $Pack ninja-build gettext cmake unzip curl build-essential
 NVIM=$(which nvim)
 NVIM_BASE="/home/$(whoami)/Documents"
 NVIM_DIR="$NVIM_BASE/neovim"
-NVIM_VERSION="v0.10.2"
+NVIM_VERSION="v0.12.2"
 
 if [ -z "$NVIM" && ! -d $NVIM_DIR ]; then
 	pushd $NVIM_BASE

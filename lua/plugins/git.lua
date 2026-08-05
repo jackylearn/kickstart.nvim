@@ -68,4 +68,43 @@ return {
       end,
     },
   },
+  {
+    'guillemaru/perfnvim',
+    config = function()
+      if vim.fn.executable 'p4' == 0 then
+        return
+      end
+
+      local p4 = require 'perfnvim'
+      p4.setup()
+
+      vim.keymap.set('n', '<leader>pa', function()
+        p4.P4add()
+      end, { noremap = true, silent = true, desc = "'p4 add' current buffer" })
+      vim.keymap.set('n', '<leader>pe', function()
+        p4.P4edit()
+      end, { noremap = true, silent = true, desc = "'p4 edit' current buffer" })
+      vim.keymap.set('n', '<leader>pR', ':!p4 revert -a %<CR>', { noremap = true, silent = true, desc = 'Revert if unchanged' })
+      vim.keymap.set('n', ']c', function()
+        if vim.wo.diff then
+          vim.cmd.normal { ']c', bang = true }
+        else
+          p4.P4next()
+        end
+      end, { noremap = true, silent = true, desc = 'Jump to next changed line' })
+      vim.keymap.set('n', '[c', function()
+        if vim.wo.diff then
+          vim.cmd.normal { '[c', bang = true }
+        else
+          p4.P4prev()
+        end
+      end, { noremap = true, silent = true, desc = 'Jump to previous changed line' })
+      vim.keymap.set('n', '<leader>po', function()
+        p4.P4opened()
+      end, { noremap = true, silent = true, desc = "'p4 opened' (telescope)" })
+      vim.keymap.set('n', '<leader>pg', function()
+        p4.P4grep()
+      end, { noremap = true, silent = true, desc = 'grep p4 files' })
+    end,
+  },
 }

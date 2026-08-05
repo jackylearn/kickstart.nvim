@@ -123,23 +123,14 @@ return { -- LSP Configuration & Plugins
     --  - settings (table): Override the default settings passed when initializing the server.
     --        For example, to see the options for `lua_ls`, you could go to: https://luals.github.io/wiki/settings/
     local servers = {
-      clangd = {},
-      typos_lsp = {},
-      pyright = {},
-      csharp_ls = {
-        handlers = {
-          ['textDocument/typeDefinition'] = require('csharpls_extended').handler,
-          ['textDocument/definition'] = require('csharpls_extended').handler,
-        },
-      },
-      gopls = {
-        analyses = {
-          unusedparams = true,
-          unusedvariable = true,
-        },
-        staticcheck = true,
-        gofumpt = true,
-        usePlaceholders = true,
+      clangd = {
+        cmd = { 'clangd', '--clang-tidy', '--header-insertion=never', '--enable-config' },
+
+        on_attach = function(client, bufnr)
+          if client.server_capabilities.inlayHintProvider then
+            vim.lsp.inlay_hint.enable(true) -- Neovim 0.10+
+          end
+        end,
       },
       lua_ls = {
         -- cmd = {...},

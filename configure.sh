@@ -26,10 +26,36 @@ if [ -z "$NVIM" && ! -d $NVIM_DIR ]; then
 fi
 
 # Install dependencies for some plugins
-$Pack jq fzf bat ripgrep npm tmux golang cargo
+$Pack jq fzf bat ripgrep npm golang cargo
 
 # Install Python related
 $Pack python3-venv python3-debugpy python3-pip
+
+# Build tmux from source and check out the 3.7b tag
+TMUX=$(which tmux)
+TMUX_DIR="$NVIM_BASE/tmux"
+TMUX_VERSION="3.7b"
+if [ -z "$TMUX" ] && [ ! -d "$TMUX_DIR" ]; then
+	# tmux build dependencies (autogen.sh is required for a git checkout)
+	$Pack libevent-dev libncurses-dev bison pkg-config automake autoconf
+
+	pushd $NVIM_BASE
+
+	git clone https://github.com/tmux/tmux.git $TMUX_DIR
+	cd $TMUX_DIR
+	git checkout $TMUX_VERSION
+	sh autogen.sh
+	# Install to ~/.local so no root is needed
+	./configure --prefix="$HOME/.local"
+	make
+	make install
+
+	popd
+
+	# Ensure ~/.local/bin is on PATH for future shells, without adding a duplicate
+	PATH_LINE='export PATH="$HOME/.local/bin:$PATH"'
+	grep -qxF "$PATH_LINE" ~/.bashrc 2>/dev/null || echo "$PATH_LINE" >>~/.bashrc
+fi
 
 # Useful utility to calculate statistics about a codebase
 TOKEI=$(which tokei)

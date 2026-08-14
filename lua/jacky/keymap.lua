@@ -27,6 +27,7 @@ vim.keymap.set('n', '<c-l>', ':wincmd l<CR>', { silent = true })
 vim.keymap.set('n', '<a-s>', '<CMD>horizontal terminal<CR>', { silent = true })
 vim.keymap.set('n', '<a-v>', '<CMD>vertical terminal<CR>', { silent = true })
 
+vim.keymap.set('t', '<Esc>', '<C-\\><C-n>', { silent = true })
 vim.keymap.set('t', '<c-h>', '<c-\\><c-n><c-w>h<cr>', { silent = true })
 vim.keymap.set('t', '<c-j>', '<c-\\><c-n><c-w>j<cr>', { silent = true })
 vim.keymap.set('t', '<c-k>', '<c-\\><c-n><c-w>k<cr>', { silent = true })
@@ -46,7 +47,6 @@ vim.api.nvim_create_autocmd('TermOpen', {
   callback = function(_)
     vim.opt.number = false
     vim.opt.relativenumber = false
-    vim.cmd.startinsert()
   end,
 })
 

@@ -85,6 +85,103 @@ vim.opt.expandtab = true
 -- Highlight the column with offset from textwidth
 vim.opt.colorcolumn = '+1'
 
+-- Allow :Termdebug
+vim.cmd 'packadd termdebug'
+
+-- Termdebug: wide mode enables the vertical split layout, variables window
+-- auto-refreshes on each stop. Use wide = 1 (not a large number) so termdebug
+-- does NOT force &columns wider than the real terminal; forcing a width makes
+-- the gdb terminal reflow/redraw and appear to lose its scrollback.
+vim.g.termdebug_config = {
+  wide = 1,
+  variables_window = 1,
+}
+
+-- Highlight the current (stopped) line during :Termdebug.
+-- Termdebug marks the stopped line with a 'debugPC' sign that uses the debugPC
+-- highlight group. tokyonight overrides debugPC to bg_sidebar (#16161e), which
+-- is darker than Normal bg (#1a1b26), so the current line is effectively
+-- invisible. Re-set it on every ColorScheme so it survives colorscheme loads
+-- and reloads (this fires when tokyonight loads later via lazy).
+vim.api.nvim_create_autocmd('ColorScheme', {
+  group = vim.api.nvim_create_augroup('termdebug-pc-highlight', { clear = true }),
+  callback = function()
+    vim.api.nvim_set_hl(0, 'debugPC', { bg = '#3d5a40' })
+  end,
+})
+-- Apply immediately in case a colorscheme is already active at this point.
+vim.api.nvim_set_hl(0, 'debugPC', { bg = '#3d5a40' })
+
+-- Target layout after :Termdebug (source on the right, debug info stacked left):
+--   variables (top-left) | source (right, full height)
+--   gdb       (bot-left) |
+--
+-- Any windows already open when :Termdebug is invoked (splits, file trees, etc.)
+-- get folded into termdebug's default layout, so we cannot assume a fixed window
+-- structure. Instead we ask termdebug for its own tracked windows via the :Gdb,
+-- :Var and :Source commands (authoritative window IDs), close every OTHER window
+-- (this only closes windows, buffers stay loaded and listed), then reshape the
+-- three remaining windows. Verified to yield row[ col[var, gdb], source ] from a
+-- single window, hsplit, vsplit, focused-left, and multi-extra starting states.
+vim.api.nvim_create_autocmd('User', {
+  pattern = 'TermdebugStartPost',
+  callback = function()
+    -- Close the program output (pty) window; we don't need program output here
+    for _, win in ipairs(vim.api.nvim_list_wins()) do
+      local buf = vim.api.nvim_win_get_buf(win)
+      if vim.api.nvim_buf_get_name(buf):find('gdb program') then
+        pcall(vim.api.nvim_win_close, win, true)
+        break
+      end
+    end
+
+    -- Ask termdebug for its own window IDs (uses s:gdbwin/s:varwin/s:sourcewin)
+    vim.cmd 'Gdb'
+    local gdb_win = vim.api.nvim_get_current_win()
+    vim.cmd 'Var'
+    local var_win = vim.api.nvim_get_current_win()
+    vim.cmd 'Source'
+    local source_win = vim.api.nvim_get_current_win()
+
+    if not vim.api.nvim_win_is_valid(gdb_win) or not vim.api.nvim_win_is_valid(source_win) then
+      return
+    end
+
+    -- Close every window that isn't one of our three (only closes the window,
+    -- not the buffer), removing any pre-existing splits from the debug layout.
+    local keep = { [gdb_win] = true, [var_win] = true, [source_win] = true }
+    for _, win in ipairs(vim.api.nvim_list_wins()) do
+      if not keep[win] then
+        pcall(vim.api.nvim_win_close, win, false)
+      end
+    end
+
+    -- Reshape: variables to far-left full height, gdb dropped below it,
+    -- source to far-right full height. (See comment above for verified result.)
+    if vim.api.nvim_win_is_valid(var_win) then
+      vim.api.nvim_set_current_win(var_win)
+      vim.cmd 'wincmd H'
+    end
+    vim.api.nvim_set_current_win(gdb_win)
+    vim.cmd 'wincmd J'
+    vim.api.nvim_set_current_win(source_win)
+    vim.cmd 'wincmd L'
+
+    -- Size: source ~60% width, variables ~1/3 of the left column height
+    vim.api.nvim_set_current_win(source_win)
+    vim.cmd('vertical resize ' .. math.floor(vim.o.columns * 0.6))
+    if vim.api.nvim_win_is_valid(var_win) then
+      vim.api.nvim_set_current_win(var_win)
+      vim.cmd('resize ' .. math.floor(vim.o.lines / 3))
+    end
+
+    -- Land in the gdb window ready for input
+    vim.api.nvim_set_current_win(gdb_win)
+    vim.cmd 'startinsert'
+  end,
+})
+
+
 -- [[ Basic Autocommands ]]
 --  See `:help lua-guide-autocommands`
 

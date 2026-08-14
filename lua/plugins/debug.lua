@@ -49,17 +49,90 @@ return {
       },
     }
 
-    -- Basic debugging keymaps, feel free to change to your liking!
-    vim.keymap.set('n', '<leader>dc', dap.continue, { desc = 'Debug: Start/Continue' })
-    vim.keymap.set('n', '<leader>di', dap.step_into, { desc = 'Debug: Step Into' })
-    vim.keymap.set('n', '<leader>dn', dap.step_over, { desc = 'Debug: Step Over' })
-    vim.keymap.set('n', '<leader>do', dap.step_out, { desc = 'Debug: Step Out' })
-    vim.keymap.set('n', '<leader>dr', dap.restart, { desc = 'Debug: Restart' })
-    vim.keymap.set('n', '<leader>df', dap.terminate, { desc = 'Debug: Stop' })
-    vim.keymap.set('n', '<leader>b', dap.toggle_breakpoint, { desc = 'Debug: Toggle Breakpoint' })
+    -- Track whether Termdebug is the active debugger
+    vim.api.nvim_create_autocmd('User', {
+      pattern = 'TermdebugStartPost',
+      callback = function()
+        vim.g.termdebug_active = true
+      end,
+    })
+    vim.api.nvim_create_autocmd('User', {
+      pattern = 'TermdebugStopPost',
+      callback = function()
+        vim.g.termdebug_active = false
+      end,
+    })
+
+    -- Unified debugging keymaps: dispatch to Termdebug or DAP at press-time
+    vim.keymap.set('n', '<leader>dc', function()
+      if vim.g.termdebug_active then
+        vim.cmd 'Continue'
+      else
+        dap.continue()
+      end
+    end, { desc = 'Debug: Start/Continue' })
+
+    vim.keymap.set('n', '<leader>di', function()
+      if vim.g.termdebug_active then
+        vim.cmd 'Step'
+      else
+        dap.step_into()
+      end
+    end, { desc = 'Debug: Step Into' })
+
+    vim.keymap.set('n', '<leader>dn', function()
+      if vim.g.termdebug_active then
+        vim.cmd 'Over'
+      else
+        dap.step_over()
+      end
+    end, { desc = 'Debug: Step Over' })
+
+    vim.keymap.set('n', '<leader>do', function()
+      if vim.g.termdebug_active then
+        vim.cmd 'Finish'
+      else
+        dap.step_out()
+      end
+    end, { desc = 'Debug: Step Out' })
+
+    vim.keymap.set('n', '<leader>dr', function()
+      if vim.g.termdebug_active then
+        vim.cmd 'Run'
+      else
+        dap.restart()
+      end
+    end, { desc = 'Debug: Restart' })
+
+    vim.keymap.set('n', '<leader>df', function()
+      if vim.g.termdebug_active then
+        vim.cmd 'Stop'
+      else
+        dap.terminate()
+      end
+    end, { desc = 'Debug: Stop' })
+
+    vim.keymap.set('n', '<leader>b', function()
+      if vim.g.termdebug_active then
+        vim.cmd 'Break'
+      else
+        dap.toggle_breakpoint()
+      end
+    end, { desc = 'Debug: Toggle Breakpoint' })
+
     vim.keymap.set('n', '<leader>B', function()
-      dap.set_breakpoint(vim.fn.input 'Breakpoint condition: ')
-    end, { desc = 'Debug: Set Breakpoint' })
+      if vim.g.termdebug_active then
+        vim.cmd 'Clear'
+      else
+        dap.set_breakpoint(vim.fn.input 'Breakpoint condition: ')
+      end
+    end, { desc = 'Debug: Set Breakpoint / Clear (Termdebug)' })
+
+    vim.keymap.set('n', '<leader>ds', function()
+      if vim.g.termdebug_active then
+        vim.fn.TermDebugSendCommand('bt')
+      end
+    end, { desc = 'Debug: Show Stack (Termdebug)' })
 
     -- Dap UI setup
     -- For more information, see |:help nvim-dap-ui|
@@ -79,13 +152,31 @@ return {
     -- Toggle to see last session result. Without this, you can't see session output in case of unhandled exception.
     vim.keymap.set('n', '<leader>dl', dapui.toggle, { desc = 'Debug: See last session result.' })
     vim.keymap.set('n', '<leader>dd', function()
-      dap.terminate()
-      dapui.close()
-    end, { desc = 'Debug: Close Debugger UI.' })
+      if vim.g.termdebug_active then
+        -- Find the gdb terminal buffer and wipe it, which kills the job
+        -- and triggers termdebug's normal cleanup path (EndTermDebug)
+        for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+          if vim.api.nvim_buf_is_loaded(buf) then
+            local name = vim.api.nvim_buf_get_name(buf)
+            if name:find('term://') and not name:find('gdb program') and not name:find('gdb communication') then
+              vim.cmd('bwipe! ' .. buf)
+              return
+            end
+          end
+        end
+      else
+        dap.terminate()
+        dapui.close()
+      end
+    end, { desc = 'Debug: Close Debugger' })
 
     -- Eval var under cursor
     vim.keymap.set('n', '<space>?', function()
-      dapui.eval(nil, { enter = true })
+      if vim.g.termdebug_active then
+        vim.cmd 'Evaluate'
+      else
+        dapui.eval(nil, { enter = true })
+      end
     end)
 
     dap.listeners.after.event_initialized['dapui_config'] = dapui.open
